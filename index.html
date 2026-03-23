@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DANIBAL - Portfolio</title>
+    <style>
+        /* ================= 全局重置 ================= */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background-color: #000; color: #fff;
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            overflow: hidden; -webkit-font-smoothing: antialiased;
+        }
+
+        /* ================= 3D 视图 & 主页 UI ================= */
+        #gallery-view { position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 1; }
+        #webgl-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; cursor: grab; }
+        #webgl-container:active { cursor: grabbing; }
+
+        .info-panel { position: absolute; top: 40px; left: 40px; z-index: 10; pointer-events: none; }
+        .info-panel h1 { font-size: 50px; font-weight: 700; letter-spacing: 1px; margin-bottom: 40px; text-transform: uppercase; }
+        .contact-block { margin-bottom: 25px; font-size: 20px; line-height: 0.9; letter-spacing: 0.5px; }
+        .contact-block span { text-transform: uppercase; color: #aaa; display: block; margin-bottom: 2px; }
+
+        .hint { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); font-size: 12px; color: #666; letter-spacing: 2px; pointer-events: none; text-transform: uppercase; animation: pulse 2s infinite; z-index: 10 }
+        @keyframes pulse { 0% { opacity: 0.3; } 50% { opacity: 1; } 100% { opacity: 0.3; } }
+
+        /* ================= 子网页 (项目详情页) ================= */
+        #project-view { display: none; position: absolute; top: 0; left: 0; width: 100vw; height: 100vh; background-color: #000; z-index: 20; overflow-y: auto; padding: 40px; scroll-behavior: smooth; }
+        .project-content { max-width: 1200px; margin: 0 auto; }
+        .back-btn { font-size: 24px; font-weight: bold; letter-spacing: 1px; cursor: pointer; display: inline-block; margin-bottom: 60px; padding-bottom: 2px; border-bottom: 1px solid #fff; transition: opacity 0.3s; }
+        .back-btn:hover { opacity: 0.6; }
+        .project-header { margin-bottom: 40px; }
+        .project-index { font-size: 12px; color: #888; letter-spacing: 1px; margin-bottom: 15px; text-transform: uppercase; }
+        .project-title { font-size: 64px; font-weight: 700; line-height: 1.1; letter-spacing: -1px; margin-bottom: 40px; text-transform: uppercase; }
+        .project-meta { display: flex; justify-content: space-between; border-top: 1px solid #333; border-bottom: 1px solid #333; padding: 15px 0; font-size: 11px; color: #888; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 40px; }
+        .project-description { font-size: 14px; line-height: 1.8; color: #ccc; max-width: 800px; margin-bottom: 80px; }
+
+        @media (max-width: 768px) {
+            .info-panel { top: 20px; left: 20px; }
+            #project-view { padding: 20px; }
+            .project-title { font-size: 36px; }
+            .project-meta { flex-direction: column; gap: 10px; }
+        }
+
+        /* ================= 自定义项目图库样式 ================= */
+        .project-gallery { width: 100%; margin-bottom: 40px; display: flex; flex-direction: column; gap: 40px; align-items: center; }
+        .project-img { max-width: 100%; height: auto; box-shadow: 0 10px 30px rgba(0,0,0,0.2); background-color: #111; }
+        .img-full { width: 100%; }
+        .img-half { width: 48%; }
+        .img-small { width: 400px; }
+
+        /* ====== 滑动显现动画 CSS ====== */
+        .scroll-reveal {
+            opacity: 0;
+            transform: translateY(60px); /* 初始状态往下偏移 60px */
+            transition: opacity 0.8s cubic-bezier(0.25, 1, 0.5, 1), transform 0.8s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+        .scroll-reveal.visible {
+            opacity: 1;
+            transform: translateY(0); /* 恢复原位 */
+        }
+
+        /* ====== 底部 CLOSE PROJECT 按钮 ====== */
+        .close-project-btn {
+            font-size: 28px; /* 中等偏大的字体 */
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            text-align: center;
+            margin-top: auto; /* 将其推到最底部 */
+            padding-top: 80px;
+            padding-bottom: 80px;
+            cursor: pointer;
+            transition: color 0.3s;
+        }
+        .close-project-btn:hover {
+            color: #666; /* 鼠标悬停变灰 */
+        }
+    </style>
+</head>
+<body>
+
+    <div id="gallery-view">
+        <div class="info-panel">
+            <h1>DANIBAL</h1>
+            <div class="contact-block"><span>WECHAT</span>AaaNnnnc</div>
+            <div class="contact-block"><span>TEL</span>+86 150 1960 2502</div>
+            <div class="contact-block"><span>MAIL</span>2501137682@qq.com</div>
+        </div>
+        <div class="hint">Double Click to Change Layout</div>
+        <div id="webgl-container"></div>
+    </div>
+
+    <div id="project-view">
+        <div class="project-content">
+            <div class="back-btn" onclick="closeProject(event)">← GALLERY</div>
+            <div class="project-header">
+                <div class="project-index" id="detail-index">PROJECT 01 / 12</div>
+                <h2 class="project-title" id="detail-title">TITLE</h2>
+            </div>
+            <div class="project-meta" id="detail-meta"></div>
+            <div class="project-description" id="detail-desc"></div>
+            <div id="detail-images" class="project-gallery"></div>
+        </div>
+         <div class="close-project-btn scroll-reveal" onclick="closeProject()">CLOSE PROJECT</div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+
+    <script>
+        // ================= 1. 定义你的项目数据 =================
+        const projectsData = [
+            {
+                title: '"ABOUT ME.',
+                category: 'MOTIVATED / CAREFUL',
+                year: ' ',
+                service: ' ',
+                description: '大家好，我是陈奕儒。喜欢设计、音乐、阅读、摄影...',
+                // ！！！在这里自定义卡片的边框！！！
+                borderConfig: {
+                    color: '#ffffff', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                },
+                images: [
+                    { src: './image/P1/1.JPG', layout: 'full' }, 
+                    { src: './image/P1/2.jpg', layout: 'half' },
+                    { src: './image/P1/3.JPG', layout: 'half' }
+                ]
+            },
+            {
+                title: 'PHOTOGRAPHY- B&W FILM',
+                category: ' ',
+                year: '2026/2025/2024',
+                service: ' ',
+                description: 'I like it when I tell stories with films.',
+                // 第2张卡片：红色细边框
+                borderConfig: { color: '#ff0000', top: 20, bottom: 20, left: 60, right: 20 },
+                images: [
+                    { src: './image/P2/1.JPG', layout: 'full' }, 
+                    { src: './image/P2/2.JPG', layout: 'half' },
+                    { src: './image/P2/3.JPG', layout: 'half' },
+                    { src: './image/P2/4.JPG', layout: 'half' },
+                    { src: './image/P2/5.jpg', layout: 'full' },
+                    { src: './image/P2/6.JPG', layout: 'half' },
+                    { src: './image/P2/7.JPG', layout: 'half' },
+                    { src: './image/P2/8.JPG', layout: 'full' }
+                ]
+            },
+            {
+                title: 'PHOTOGRAPHY- LANDSCAPE',
+                category: ' ',
+                year: '2026/2025/2024',
+                service: ' ',
+                description: 'Lovely cats and etc.',
+                // 第3张卡片：蓝色粗边框
+                borderConfig: { color: '#0055ff', top: 20, bottom: 20, left: 60, right: 20 },
+                images: [  
+                    { src: './image/P3/1.jpg', layout: 'full' }, 
+                    { src: './image/P3/2.jpg', layout: 'half' },
+                    { src: './image/P3/3.jpg', layout: 'half' },
+                    { src: './image/P3/4.jpg', layout: 'full' },
+                    { src: './image/P3/5.JPG', layout: 'half' } 
+                ]
+            },
+            // 项目 4
+            {
+                title: 'PHOTOGRAPHY- DOCUMENTARY',
+                category: ' ',
+                year: '2026/2025/2024',
+                service: ' ',
+                description: 'People\'s emotions always fascinate me.',
+                borderConfig: {
+                    color: '#ffffff', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                    },
+                images: [ 
+                    { src: './image/P4/1.jpg', layout: 'full' },
+                    { src: './image/P4/2.JPG', layout: 'half' },
+                    { src: './image/P4/3.jpg', layout: 'half' },
+                    { src: './image/P4/4.jpg', layout: 'full' },
+                    { src: './image/P4/5.jpg', layout: 'half' },
+                    { src: './image/P4/6.jpg', layout: 'full' },
+                    { src: './image/P4/7.JPG', layout: 'half' }
+                ]
+            },
+            // 项目 5
+            {
+                title: 'ADVERTISING ART DESIGN FOR COLLEGE STUDENT 2025',
+                category: 'ADVERTISING / VIDEOS',
+                year: '2025',
+                service: 'FILM & TV',
+                description: 'SANFU',
+                borderConfig: {
+                    color: '#FFD700', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                    },
+                images: [ { src: './image/P5/1.jpg', layout: 'full' } ]
+            },
+            // 项目 6
+            {
+                title: 'ADVERTISING ART DESIGN FOR COLLEGE STUDENT 2025',
+                category: 'ADVERTISING / VIDEOS',
+                year: '2025',
+                service: 'FILM & TV',
+                description: 'POPMART',
+                borderConfig: {
+                    color: '#00008B', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                    },
+                images: [ { src: './image/P6/1.jpg', layout: 'full' } ]
+            },
+            // 项目 7
+            {
+                title: 'ALBUM COVER - 01',
+                category: 'GRAPHIC DESIGN',
+                year: '2024',
+                service: ' ',
+                description: ' ',
+                borderConfig: {
+                    color: '#8B0000', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                    },
+                images: [ { src: './image/P7/1.jpg', layout: 'full' } ]
+            },
+            // 项目 8
+            {
+                title: 'ALBUM COVER - 02',
+                category: 'GRAPHIC DESIGN',
+                year: '2024',
+                service: ' ',
+                description: ' ',
+                borderConfig: {
+                    color: '#FFFFF0', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                    },
+                images: [ { src: './image/P8/1.jpg', layout: 'full' } ]
+            },
+            // 项目 9
+            {
+                title: 'ALBUM COVER - 03',
+                category: 'GRAPHIC DESIGN',
+                year: '2024',
+                service: ' ',
+                description: ' ',
+                borderConfig: {
+                    color: '#FFFFF0', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                    },
+                images: [ { src: './image/P9/1.jpg', layout: 'full' } ]
+            },
+            // 项目 10
+            {
+                title: 'POSTER - 01',
+                category: 'GRAPHIC DESIGN',
+                year: '2024',
+                service: ' ',
+                description: 'Of my favorite movie.',
+                borderConfig: {
+                    color: '#8A2BE2', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                    },
+                images: [ { src: './image/P10/1.jpg', layout: 'full' } ]
+            },
+            // 项目 11
+            {
+                title: 'POSTER - 01',
+                category: 'GRAPHIC DESIGN',
+                year: '2024',
+                service: ' ',
+                description: 'A COPY.',
+                borderConfig: {
+                    color: '#FFFF00', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                    },
+                images: [ { src: './image/P11/1.jpg', layout: 'full' } ]
+            },
+            // 项目 12
+            {
+                title: 'FEATURED VIDEO COVER',
+                category: 'GRAPHIC DESIGN',
+                year: '2025',
+                service: ' ',
+                description: ' ',
+                borderConfig: {
+                    color: '#0000CD', // 边框颜色 (比如白色)
+                    top: 20,          // 上边框宽度
+                    bottom: 20,       // 下边框宽度 (故意做宽一点，类似拍立得)
+                    left: 80,         // 左边框宽度
+                    right: 20         // 右边框宽度
+                    },
+                images: [ 
+                    { src: './image/P12/1.jpg', layout: 'full' },
+                    { src: './image/P12/2.jpg', layout: 'half' },
+                    { src: './image/P12/3.jpg', layout: 'half' },
+                    { src: './image/P12/4.jpg', layout: 'full' },
+                ]
+            }
+        ];
+
+        // ================= 页面切换与滚动动画逻辑 =================
+        const galleryView = document.getElementById('gallery-view');
+        const projectView = document.getElementById('project-view');
+
+        // 创建交叉观察器 (用于图片滑动显现动画)
+        const scrollObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible'); // 添加类名触发CSS动画
+                    observer.unobserve(entry.target); // 动画只执行一次，执行完取消监听
+                }
+            });
+        }, {
+            root: projectView, // 监听在详情页里的滚动
+            threshold: 0.1,    // 图片露出 10% 时触发
+            rootMargin: "0px 0px -50px 0px" // 稍微提前一点触发
+        });
+
+        function openProject(index) {
+            const data = projectsData[index];
+            if(!data) return;
+
+            document.getElementById('detail-index').innerText = `PROJECT ${String(index+1).padStart(2, '0')} / 12`;
+            document.getElementById('detail-title').innerText = data.title;
+            document.getElementById('detail-desc').innerText = data.description;
+            
+            document.getElementById('detail-meta').innerHTML = `
+                <div>CATEGORY: ${data.category}</div><div>YEAR: ${data.year}</div><div>SERVICE: ${data.service}</div>
+            `;
+
+            const galleryContainer = document.getElementById('detail-images');
+            galleryContainer.innerHTML = ''; 
+
+            data.images.forEach(imgData => {
+                const img = document.createElement('img');
+                img.src = imgData.src;
+                img.classList.add('project-img');
+                // 添加 scroll-reveal 类，准备接受动画
+                img.classList.add('scroll-reveal'); 
+                
+                if(imgData.layout === 'full') img.classList.add('img-full');
+                if(imgData.layout === 'half') img.classList.add('img-half');
+                if(imgData.layout === 'small') img.classList.add('img-small');
+
+                galleryContainer.appendChild(img);
+                
+                // 将新生成的图片交给观察器监听
+                scrollObserver.observe(img);
+            });
+
+             const bottomCloseBtn = document.querySelector('.close-project-btn');
+            bottomCloseBtn.classList.remove('visible');
+            scrollObserver.observe(bottomCloseBtn);
+
+            galleryView.style.display = 'none';
+            projectView.style.display = 'block';
+            projectView.scrollTop = 0;
+        }
+
+        function closeProject() {
+            projectView.style.display = 'none';
+            galleryView.style.display = 'block';
+        }
+
+
+        // ================= Three.js 核心 =================
+        const container = document.getElementById('webgl-container');
+        let scene, camera, renderer, controls;
+        const cardsData = []; 
+        let ringGroup; 
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let hoveredCard = null;
+        let isFlatLayout = false; 
+        let isDragging = false; 
+
+        const numCards = 12;
+        const cardWidth = 6;
+        const cardHeight = 4;
+        const innerRadius = 0.5; 
+
+        // 你本地的图片映射数组
+        const imageNames = ['card1.jpg', 'card2.jpg', 'card3.jpg', 'card4.jpg',  'card5.jpg','card6.jpg', 'card7.jpg', 'card8.jpg', 'card9.jpg', 'card10.jpg', 'card11.jpg', 'card12.jpg'];
+
+        init3D();
+        animate();
+
+        function init3D() {
+            scene = new THREE.Scene();
+            scene.fog = new THREE.FogExp2(0x000000, 0.015);
+
+            camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 6, 16); 
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.enablePan = false;
+            controls.minDistance = 10;
+            controls.maxDistance = 60;
+            controls.maxPolarAngle = Math.PI / 1.2;
+
+            controls.addEventListener('start', () => isDragging = true);
+            controls.addEventListener('end', () => isDragging = false);
+
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+            directionalLight.position.set(10, 20, 15);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            scene.add(directionalLight);
+
+            ringGroup = new THREE.Group();
+            scene.add(ringGroup);
+
+            // 生成带有自定义边框的卡片
+            for (let i = 0; i < numCards; i++) {
+                const texture = createCardTextureWithBorder(i);
+                
+                const material = new THREE.MeshStandardMaterial({
+                    map: texture,
+                    side: THREE.DoubleSide,
+                    roughness: 0.2,
+                    metalness: 0.1,
+                    emissive: 0xffffff,
+                    emissiveIntensity: 0 
+                });
+
+                const geometry = new THREE.PlaneGeometry(cardWidth, cardHeight);
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                mesh.userData = { id: i };
+
+                const pivot = new THREE.Group();
+                const angle = (i / numCards) * Math.PI * 2;
+                pivot.rotation.y = -angle; 
+
+                pivot.add(mesh);
+                ringGroup.add(pivot); 
+
+                cardsData.push({ mesh: mesh, pivot: pivot, id: i });
+                setToVerticalState(mesh, i);
+            }
+
+            window.addEventListener('resize', onWindowResize);
+            window.addEventListener('mousemove', onMouseMove);
+            window.addEventListener('click', onClick);
+            window.addEventListener('dblclick', onDoubleClick);
+        }
+
+        // ====== 绘制卡片边框的核心逻辑 ======
+        function createCardTextureWithBorder(index) {
+            const data = projectsData[index];
+            const actualImageUrl = `./image/cards/${imageNames[index]}`;
+
+            // 创建一个虚拟画布，比例固定为 3:2
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 683;
+            const ctx = canvas.getContext('2d');
+
+            const texture = new THREE.CanvasTexture(canvas);
+            texture.encoding = THREE.sRGBEncoding;
+            texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+
+            const img = new Image();
+            img.src = actualImageUrl;
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = () => {
+                // 1. 先把图片画满整个卡片
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                
+                // 2. 如果配置了边框，就用色块在图片四周“盖住”形成边框
+                const border = data.borderConfig;
+                if (border) {
+                    ctx.fillStyle = border.color || '#ffffff';
+                    // 顶边
+                    if (border.top) ctx.fillRect(0, 0, canvas.width, border.top);
+                    // 底边
+                    if (border.bottom) ctx.fillRect(0, canvas.height - border.bottom, canvas.width, border.bottom);
+                    // 左边
+                    if (border.left) ctx.fillRect(0, 0, border.left, canvas.height);
+                    // 右边
+                    if (border.right) ctx.fillRect(canvas.width - border.right, 0, border.right, canvas.height);
+                }
+                // 必须通知 ThreeJS 纹理已更新
+                texture.needsUpdate = true;
+            };
+            return texture;
+        }
+
+        // ================= 状态计算函数 =================
+        function getVerticalState(index) {
+            return { x: innerRadius + cardWidth / 2, y: 0, z: 0, rotX: 0, rotY: 0, rotZ: 0 };
+        }
+
+        function getFlatState(index) {
+            const yOffset = (index - numCards / 2) * 0.05; 
+            return { x: innerRadius + cardWidth / 2, y: yOffset, z: 0, rotX: -70 * THREE.MathUtils.DEG2RAD, rotY: 0, rotZ: 0 };
+        }
+
+        function setToVerticalState(mesh, index) {
+            const state = getVerticalState(index);
+            mesh.position.set(state.x, state.y, state.z);
+            mesh.rotation.set(state.rotX, state.rotY, state.rotZ);
+        }
+
+        // ================= 交互逻辑 =================
+        function onMouseMove(event) {
+            if (projectView.style.display === 'block') return;
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const meshes = cardsData.map(data => data.mesh);
+            const intersects = raycaster.intersectObjects(meshes);
+
+            if (intersects.length > 0) {
+                const object = intersects[0].object;
+                if (hoveredCard !== object) {
+                    if (hoveredCard) gsap.to(hoveredCard.material, { emissiveIntensity: 0, duration: 0.3 });
+                    hoveredCard = object;
+                    gsap.to(hoveredCard.material, { emissiveIntensity: 0.3, duration: 0.3 });
+                    container.style.cursor = 'pointer';
+                }
+            } else {
+                if (hoveredCard) {
+                    gsap.to(hoveredCard.material, { emissiveIntensity: 0, duration: 0.3 });
+                    hoveredCard = null;
+                    container.style.cursor = 'grab';
+                }
+            }
+        }
+
+        // 修复后的纯净版 onClick
+        function onClick(event) {
+            // 杀手锏：如果点击的目标不是 3D 画布 (renderer.domElement)，直接拦截！不作任何处理！
+            if (event.target !== renderer.domElement) return;
+
+            if (hoveredCard) {
+                const projectId = hoveredCard.userData.id;
+                openProject(projectId);
+            }
+        }
+
+        function onDoubleClick(event) {
+            if (projectView.style.display === 'block') return;
+
+            isFlatLayout = !isFlatLayout;
+            cardsData.forEach((data) => {
+                const targetState = isFlatLayout ? getFlatState(data.id) : getVerticalState(data.id);
+                gsap.to(data.mesh.position, { x: targetState.x, y: targetState.y, z: targetState.z, duration: 2, ease: "power3.inOut" });
+                gsap.to(data.mesh.rotation, { x: targetState.rotX, y: targetState.rotY, z: targetState.rotZ, duration: 2, ease: "power3.inOut" });
+            });
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (!isDragging) {
+                ringGroup.rotation.y -= 0.0008; 
+            }
+            controls.update();
+            renderer.render(scene, camera);
+        }
+    </script>
+</body>
+</html>
