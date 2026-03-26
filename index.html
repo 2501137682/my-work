@@ -35,7 +35,7 @@
         .project-index { font-size: 12px; color: #888; letter-spacing: 1px; margin-bottom: 15px; text-transform: uppercase; }
         .project-title { font-size: 64px; font-weight: 700; line-height: 1.1; letter-spacing: -1px; margin-bottom: 40px; text-transform: uppercase; }
         .project-meta { display: flex; justify-content: space-between; border-top: 1px solid #333; border-bottom: 1px solid #333; padding: 15px 0; font-size: 11px; color: #888; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 40px; }
-        .project-description { font-size: 14px; line-height: 1.8; color: #ccc; max-width: 800px; margin-bottom: 80px; }
+        .project-description { font-size: 18px; line-height: 1.8; color: #ccc; max-width: 800px; margin-bottom: 80px; }
 
         @media (max-width: 768px) {
             .info-panel { top: 20px; left: 20px; }
@@ -404,11 +404,13 @@
         let hoveredCard = null;
         let isFlatLayout = false; 
         let isDragging = false; 
+        let lastTap = 0;
 
         const numCards = 12;
         const cardWidth = 6;
         const cardHeight = 4;
         const innerRadius = 0.5; 
+        const hoverOffset = 3; // 卡片弹出距离（可以调）
 
         // 你本地的图片映射数组
         const imageNames = ['card1.jpg', 'card2.jpg', 'card3.jpg', 'card4.jpg',  'card5.jpg','card6.jpg', 'card7.jpg', 'card8.jpg', 'card9.jpg', 'card10.jpg', 'card11.jpg', 'card12.jpg'];
@@ -548,33 +550,92 @@
             mesh.rotation.set(state.rotX, state.rotY, state.rotZ);
         }
 
+        function onTouchStart(event) {
+    if (projectView.style.display === 'block') return;
+
+    const now = new Date().getTime();
+    const tapDelay = now - lastTap;
+
+    const touch = event.touches[0];
+
+    mouse.x = (touch.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(touch.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+    const meshes = cardsData.map(data => data.mesh);
+    const intersects = raycaster.intersectObjects(meshes);
+
+    if (tapDelay < 300 && tapDelay > 0) {
+        // 👇 双击 → 切换布局
+        onDoubleClick();
+    } else {
+        if (intersects.length > 0) {
+            const object = intersects[0].object;
+            openProject(object.userData.id);
+        }
+    }
+
+    lastTap = now;
+}
+
         // ================= 交互逻辑 =================
         function onMouseMove(event) {
-            if (projectView.style.display === 'block') return;
+    if (projectView.style.display === 'block') return;
 
-            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-            raycaster.setFromCamera(mouse, camera);
-            const meshes = cardsData.map(data => data.mesh);
-            const intersects = raycaster.intersectObjects(meshes);
+    raycaster.setFromCamera(mouse, camera);
+    const meshes = cardsData.map(data => data.mesh);
+    const intersects = raycaster.intersectObjects(meshes);
 
-            if (intersects.length > 0) {
-                const object = intersects[0].object;
-                if (hoveredCard !== object) {
-                    if (hoveredCard) gsap.to(hoveredCard.material, { emissiveIntensity: 0, duration: 0.3 });
-                    hoveredCard = object;
-                    gsap.to(hoveredCard.material, { emissiveIntensity: 0.3, duration: 0.3 });
-                    container.style.cursor = 'pointer';
-                }
-            } else {
-                if (hoveredCard) {
-                    gsap.to(hoveredCard.material, { emissiveIntensity: 0, duration: 0.3 });
-                    hoveredCard = null;
-                    container.style.cursor = 'grab';
-                }
+    if (intersects.length > 0) {
+        const object = intersects[0].object;
+
+        if (hoveredCard !== object) {
+
+            // 👇 旧卡片复位
+            if (hoveredCard) {
+                const oldData = cardsData.find(d => d.mesh === hoveredCard);
+                gsap.to(hoveredCard.position, {
+                    x: innerRadius + cardWidth / 2,
+                    duration: 0.4,
+                    ease: "power3.out"
+                });
+                gsap.to(hoveredCard.material, { emissiveIntensity: 0, duration: 0.3 });
             }
+
+            hoveredCard = object;
+
+            // 👇 新卡片弹出
+            gsap.to(hoveredCard.position, {
+                x: innerRadius + cardWidth / 2 + hoverOffset,
+                duration: 0.35,
+                ease: "back.out(2)" // ⭐弹性效果关键！
+            });
+
+            gsap.to(hoveredCard.material, { emissiveIntensity: 0.4, duration: 0.3 });
+
+            container.style.cursor = 'pointer';
         }
+    } else {
+        if (hoveredCard) {
+            const oldData = cardsData.find(d => d.mesh === hoveredCard);
+
+            // 👇 回到原位
+            gsap.to(hoveredCard.position, {
+                x: innerRadius + cardWidth / 2,
+                duration: 0.4,
+                ease: "power3.out"
+            });
+
+            gsap.to(hoveredCard.material, { emissiveIntensity: 0, duration: 0.3 });
+
+            hoveredCard = null;
+            container.style.cursor = 'grab';
+        }
+    }
+}
 
         // 修复后的纯净版 onClick
         function onClick(event) {
